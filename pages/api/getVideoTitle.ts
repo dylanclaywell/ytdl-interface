@@ -27,7 +27,7 @@ const handler: NextApiHandler<GetVideoTitleResponse> = async (req, res) => {
       title,
     })
   } catch (e) {
-    console.log(e)
+    console.error(e)
     return res.status(500).json({ message: 'Could not get title (2)' })
   }
 }
