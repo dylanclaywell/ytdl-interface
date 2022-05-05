@@ -16,10 +16,15 @@ export default function ({
   return (
     <button
       disabled={isDisabled}
-      className={classnames({
-        'text-cyan-700 font-bold uppercase tracking-widest px-4 hover:bg-cyan-700 hover:text-white duration-200 rounded-md disabled:text-gray-500 disabled:hover:bg-transparent':
-          variant === 'text',
-      })}
+      className={classnames(
+        'h-11 font-bold uppercase tracking-widest px-4 duration-200 rounded-md',
+        {
+          'text-cyan-700 hover:bg-cyan-700 hover:text-white  disabled:text-gray-300 disabled:hover:bg-transparent':
+            variant === 'text',
+          'bg-cyan-700 text-white hover:bg-cyan-800 disabled:bg-gray-400 disabled:hover:bg-gray-400':
+            variant === 'filled',
+        }
+      )}
       onClick={onClick}
     >
       {label}

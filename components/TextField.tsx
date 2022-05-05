@@ -14,7 +14,7 @@ export default function TextField({ value, onChange, label }: Props) {
     <div className="relative">
       <input
         id={id}
-        className="border w-full border-gray-400 rounded-md p-2"
+        className="border w-full border-gray-400 rounded-md p-2 h-11"
         value={value}
         onChange={onChange}
       />
