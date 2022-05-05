@@ -130,7 +130,7 @@ const Home: NextPage = () => {
 
       <div
         className={classnames(
-          'flex duration-150 justify-between items-center fixed bottom-0 left-0 right-0 p-4 shadow-[0px_4px_10px_4px_rgba(0,0,0,0.4)]',
+          'flex duration-150 bg-white justify-between items-center fixed bottom-0 left-0 right-0 p-4 shadow-[0px_4px_10px_4px_rgba(0,0,0,0.4)]',
           { 'translate-y-full shadow-none': !queue.length }
         )}
       >
