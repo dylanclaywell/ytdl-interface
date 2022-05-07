@@ -135,7 +135,7 @@ const Home: NextPage = () => {
         )}
       >
         <span>
-          {queue.length} video{queue.length !== 1 && 's'} selected
+          {queue.length} video{queue.length !== 1 && 's'} queued
         </span>
         <Button label="Start" onClick={() => {}} variant="filled" />
       </div>

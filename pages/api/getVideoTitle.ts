@@ -1,6 +1,40 @@
 import { NextApiHandler } from 'next'
-import axios from 'axios'
 import { GetVideoTitleResponse } from '../../types/getVideoTitle'
+import { exec } from 'child_process'
+
+interface Metadata {
+  title: string
+}
+
+function isObject(obj: unknown): obj is Record<string, unknown> {
+  return typeof obj === 'object' && obj !== null && !Array.isArray(obj)
+}
+
+function isValidMetadata(metadata: unknown): metadata is Metadata {
+  return (
+    isObject(metadata) &&
+    'title' in metadata &&
+    typeof metadata.title === 'string'
+  )
+}
+
+async function getVideoMetadata(url: string) {
+  return new Promise<Metadata>((resolve, reject) => {
+    try {
+      exec(`youtube-dl --dump-json ${url}`, (error, stdout) => {
+        const metadata = JSON.parse(stdout)
+
+        if (!isValidMetadata(metadata)) {
+          throw new Error('Invalid metadata')
+        }
+
+        resolve(metadata)
+      })
+    } catch (e) {
+      reject(e)
+    }
+  })
+}
 
 const handler: NextApiHandler<GetVideoTitleResponse> = async (req, res) => {
   let url = req.query.url
@@ -9,15 +43,10 @@ const handler: NextApiHandler<GetVideoTitleResponse> = async (req, res) => {
     return res.status(400).json({ message: 'Invalid request (1)' })
   }
 
-  if (!/^https:\/\/www.youtube.com\/watch\?v=\S+$/.test(url)) {
-    url = `https://www.youtube.com/watch?v=${url}`
-  }
-
   try {
-    const response = await axios.get(url)
-    const title = response.data
-      .match(/<title>(.*)<\/title>/)[1]
-      ?.split(' - YouTube')[0]
+    const metadata = await getVideoMetadata(url)
+
+    const title = metadata.title
 
     if (!title) {
       return res.status(500).json({ message: 'Could not get title (1)' })
