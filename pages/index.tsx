@@ -2,13 +2,16 @@ import { ChangeEvent, useState } from 'react'
 import type { NextPage } from 'next'
 import Head from 'next/head'
 import { v4 as generateUuid } from 'uuid'
+import classnames from 'classnames'
 
-import { GetVideoTitleResponse } from '../types/getVideoTitle'
+import { Format, GetVideoMetadataResponse } from '../types/getVideoMetadata'
 import QueuedVideo from '../components/QueuedVideo'
 import VideoDetails from '../components/VideoDetails'
 import Header from '../components/Header'
 import Button from '../components/Button'
-import classnames from 'classnames'
+import { parseDuration } from '../utils/parseDuration'
+import { parseFileSize } from '../utils/parseFileSize'
+import { sortFormats } from '../utils/sortFormats'
 
 interface FormFields {
   addUrl: string | undefined
@@ -19,10 +22,16 @@ const blankFormFields: FormFields = {
 }
 
 interface Video {
-  id?: string
   uuid: string
+  id?: string
+  description?: string
   title?: string
   url: string
+  fileSize?: string
+  duration?: string
+  durationInMilliseconds?: number
+  availableFormats?: Format[]
+  selectedFormat?: Format
 }
 
 const Home: NextPage = () => {
@@ -33,11 +42,34 @@ const Home: NextPage = () => {
 
   const selectedVideo = queue.find((v) => v.uuid === selectedVideoId)
 
+  const totalDuration = parseDuration(
+    queue.reduce((acc, val) => {
+      acc += val.durationInMilliseconds ?? 0
+      return acc
+    }, 0)
+  )
+
+  const totalFileSize = parseFileSize(
+    queue.reduce((acc, val) => {
+      acc += val.selectedFormat?.fileSizeInBytes ?? 0
+      return acc
+    }, 0)
+  )
+
   function onFormFieldChange(
     e: ChangeEvent<HTMLInputElement>,
     fieldName: keyof FormFields
   ) {
     setFormFields({ ...formFields, [fieldName]: e.target.value })
+  }
+
+  function onVideoFormatChange(videoUuid: string, format: Format) {
+    setQueue((q) => {
+      return q.map((v) => ({
+        ...v,
+        ...(v.uuid === videoUuid && { selectedFormat: format }),
+      }))
+    })
   }
 
   async function addVideoToQueue() {
@@ -57,23 +89,31 @@ const Home: NextPage = () => {
     }
 
     fetch(
-      `http://localhost:3000/api/getVideoTitle?url=${encodeURIComponent(
+      `http://localhost:3000/api/getVideoMetadata?url=${encodeURIComponent(
         formFields.addUrl
       )}`,
       {
         method: 'GET',
       }
     ).then(async (data) => {
-      const { title } = (await data.json()) as GetVideoTitleResponse
+      const videoMetadataResponse =
+        (await data.json()) as GetVideoMetadataResponse
 
-      if (title) {
-        setQueue((q) => {
-          return q.map((v) => ({
-            ...v,
-            ...(v.uuid === uuid && { title }),
-          }))
-        })
+      if ('message' in videoMetadataResponse) {
+        console.error(videoMetadataResponse.message)
+        return
       }
+
+      setQueue((q) => {
+        return q.map((v) => ({
+          ...v,
+          ...(v.uuid === uuid && {
+            ...videoMetadataResponse,
+            selectedFormat:
+              videoMetadataResponse.availableFormats?.sort(sortFormats)[0],
+          }),
+        }))
+      })
     })
 
     setFormFields((fields) => ({ ...fields, addUrl: undefined }))
@@ -92,7 +132,7 @@ const Home: NextPage = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main className="divide-y p-4 pb-0 h-full flex flex-col">
+      <main className="divide-y p-4 pb-0 h-full flex flex-col overflow-hidden">
         <Header
           addUrl={formFields.addUrl}
           addVideoToQueue={addVideoToQueue}
@@ -116,12 +156,19 @@ const Home: NextPage = () => {
               />
             ))}
           </section>
-          <div className="flex-shrink border-r border-r-gray-100" />
-          <section className="w-full p-4">
+          <div className="flex-shrink border-r border-r-gray-200" />
+          <section className="w-full p-4 overflow-y-auto h-[calc(100%-8.5rem)]">
             {selectedVideo && (
               <VideoDetails
                 id={selectedVideo.id}
+                uuid={selectedVideo.uuid}
+                selectedFormat={selectedVideo.selectedFormat}
                 title={selectedVideo.title ?? selectedVideo.url}
+                description={selectedVideo.description}
+                fileSize={selectedVideo.fileSize}
+                duration={selectedVideo.duration}
+                availableFormats={selectedVideo.availableFormats}
+                onFormatChange={onVideoFormatChange}
               />
             )}
           </section>
@@ -137,6 +184,8 @@ const Home: NextPage = () => {
         <span>
           {queue.length} video{queue.length !== 1 && 's'} queued
         </span>
+        <span>{totalDuration}</span>
+        <span>{totalFileSize}</span>
         <Button label="Start" onClick={() => {}} variant="filled" />
       </div>
     </div>
