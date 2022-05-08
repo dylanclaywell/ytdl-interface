@@ -8,10 +8,13 @@ interface Props {
   url: string | undefined
   isHovered: boolean
   isSelected: boolean
+  isDragging: boolean
   onMouseEnter: (uuid: string) => void
   onMouseLeave: (uuid: string) => void
   onSelect: (uuid: string) => void
   onDelete: (uuid: string) => void
+  onMouseUp: (uuid: string) => void
+  onMouseDown: (uuid: string) => void
 }
 
 export default function QueuedVideo({
@@ -20,14 +23,16 @@ export default function QueuedVideo({
   url,
   isHovered,
   isSelected,
+  isDragging,
   onSelect,
   onMouseEnter,
   onMouseLeave,
   onDelete,
+  onMouseDown,
+  onMouseUp,
 }: Props) {
   const mouse = useMouse()
   const ref = useRef<HTMLButtonElement | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
 
   useEffect(() => {
     if (ref.current && isDragging) {
@@ -44,7 +49,10 @@ export default function QueuedVideo({
       key={uuid}
       className={classnames(
         'flex justify-between items-center text-left w-full p-2 hover:bg-gray-100',
-        { absolute: isDragging, 'bg-gray-200 hover:bg-gray-100': isSelected }
+        {
+          'absolute z-10': isDragging,
+          'bg-gray-200 hover:bg-gray-100': isSelected,
+        }
       )}
       onClick={() => onSelect(uuid)}
       onMouseEnter={() => onMouseEnter(uuid)}
@@ -58,7 +66,7 @@ export default function QueuedVideo({
           ref.current.style.maxWidth = ''
         }
 
-        setIsDragging(false)
+        onMouseUp(uuid)
       }}
     >
       <span className="flex items-center justify-center">
@@ -74,7 +82,7 @@ export default function QueuedVideo({
               }px`
             }
 
-            setIsDragging(true)
+            onMouseDown(uuid)
           }}
         >
           drag_indicator

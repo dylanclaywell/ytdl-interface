@@ -32,15 +32,18 @@ interface Video {
   durationInMilliseconds?: number
   availableFormats?: Format[]
   selectedFormat?: Format
+  sortOrder: number
 }
 
 const Home: NextPage = () => {
   const [formFields, setFormFields] = useState<FormFields>(blankFormFields)
   const [queue, setQueue] = useState<Video[]>([])
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null)
+  const [draggingVideoId, setDraggingVideoId] = useState<string | null>(null)
   const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null)
 
   const selectedVideo = queue.find((v) => v.uuid === selectedVideoId)
+  const draggingVideo = queue.find((v) => v.uuid === draggingVideoId)
 
   const totalDuration = parseDuration(
     queue.reduce((acc, val) => {
@@ -82,10 +85,11 @@ const Home: NextPage = () => {
         /^https:\/\/www.youtube.com\/watch\?v=(\S+)$/
       )?.[1] ?? formFields.addUrl
 
-    const video = {
+    const video: Video = {
       uuid,
       id,
       url: formFields.addUrl,
+      sortOrder: queue.length + 1,
     }
 
     fetch(
@@ -141,19 +145,35 @@ const Home: NextPage = () => {
 
         <div className="flex h-full">
           <section className="py-4 w-full">
-            {queue.map((video) => (
-              <QueuedVideo
-                key={video.uuid}
-                isHovered={hoveredVideoId === video.uuid}
-                onSelect={() => setSelectedVideoId(video.uuid)}
-                onDelete={() => deleteVideo(video.uuid)}
-                isSelected={selectedVideo?.uuid === video.uuid}
-                onMouseEnter={() => setHoveredVideoId(video.uuid)}
-                onMouseLeave={() => setHoveredVideoId(null)}
-                title={video.title}
-                url={video.url}
-                uuid={video.uuid}
-              />
+            {queue.map((video, index) => (
+              <>
+                <QueuedVideo
+                  key={video.uuid}
+                  isHovered={hoveredVideoId === video.uuid}
+                  onSelect={() => setSelectedVideoId(video.uuid)}
+                  onDelete={() => deleteVideo(video.uuid)}
+                  isSelected={selectedVideoId === video.uuid}
+                  isDragging={draggingVideoId === video.uuid}
+                  onMouseEnter={() => setHoveredVideoId(video.uuid)}
+                  onMouseLeave={() => setHoveredVideoId(null)}
+                  onMouseDown={() => setDraggingVideoId(video.uuid)}
+                  onMouseUp={() => setDraggingVideoId(null)}
+                  title={video.title}
+                  url={video.url}
+                  uuid={video.uuid}
+                />
+                <div
+                  className={classnames(
+                    "fixed after:text-transparent after:content-['fake-video'] p-2 after:fixed",
+                    {
+                      'relative after:relative bg-cyan-100':
+                        draggingVideo && index === draggingVideo.sortOrder - 1,
+                      'top-0 left-0':
+                        !draggingVideo || index !== draggingVideo.sortOrder - 1,
+                    }
+                  )}
+                />
+              </>
             ))}
           </section>
           <div className="flex-shrink border-r border-r-gray-200" />
