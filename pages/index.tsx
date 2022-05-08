@@ -147,7 +147,7 @@ const Home: NextPage = () => {
                 isHovered={hoveredVideoId === video.uuid}
                 onSelect={() => setSelectedVideoId(video.uuid)}
                 onDelete={() => deleteVideo(video.uuid)}
-                isSelected={false}
+                isSelected={selectedVideo?.uuid === video.uuid}
                 onMouseEnter={() => setHoveredVideoId(video.uuid)}
                 onMouseLeave={() => setHoveredVideoId(null)}
                 title={video.title}
