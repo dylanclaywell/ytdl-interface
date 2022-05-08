@@ -3,7 +3,6 @@ import { exec } from 'child_process'
 
 import {
   GetVideoMetadataResponse,
-  Metadata,
   YtdlFormat,
   YtdlMetadata,
 } from '../../types/getVideoMetadata'
@@ -14,28 +13,161 @@ function isObject(obj: unknown): obj is Record<string, unknown> {
   return typeof obj === 'object' && obj !== null && !Array.isArray(obj)
 }
 
+type ValidType =
+  | 'string'
+  | 'number'
+  | 'bigint'
+  | 'boolean'
+  | 'symbol'
+  | 'undefined'
+  | 'object'
+  | 'function'
+  | 'array'
+
+function isValidType({
+  fieldName,
+  isNullable,
+  value,
+  type,
+  validator,
+}: {
+  fieldName: string
+  isNullable?: boolean
+  value: unknown
+  type: ValidType | ValidType[]
+  validator?: (object: unknown) => void
+}): boolean {
+  if (isNullable && value === null) {
+    return true
+  }
+
+  console.log(
+    type,
+    type === 'array' &&
+      Array.isArray(value) &&
+      validator &&
+      value.every(validator)
+  )
+
+  if (
+    type === 'array' &&
+    !(Array.isArray(value) && validator && value.every(validator))
+  ) {
+    console.error(`array ${fieldName} is not valid`)
+    return false
+  } else if (
+    type !== 'array' &&
+    typeof type === 'string' &&
+    typeof value !== type
+  ) {
+    console.error(`${fieldName} is not type ${type}`)
+    return false
+  }
+
+  if (Array.isArray(type) && !type.includes(typeof value)) {
+    console.error(`${fieldName} is not in type ${type.join(' | ')}`)
+    return false
+  }
+
+  return true
+}
+
+function fieldIsValid({
+  fieldName,
+  object,
+  isNullable,
+  type,
+  validator,
+}: {
+  fieldName: string
+  object: unknown
+  isNullable?: boolean
+  type: ValidType | ValidType[]
+  validator?: (object: unknown) => void
+}): boolean {
+  if (!isObject(object)) {
+    console.error('Not an object')
+    return false
+  }
+
+  if (!(fieldName in object)) {
+    console.error(`${fieldName} is not in object`)
+    return false
+  }
+
+  const value = object[fieldName]
+
+  if (!isValidType({ fieldName, validator, isNullable, value, type })) {
+    console.error(`${fieldName} type is not valid`)
+    return false
+  }
+
+  return true
+}
+
+interface FormatValidation {
+  fieldName: keyof YtdlFormat
+  type: ValidType | ValidType[]
+  isNullable?: boolean
+}
+const formatValidation: FormatValidation[] = [
+  {
+    fieldName: 'filesize',
+    type: ['string', 'number'],
+    isNullable: true,
+  },
+  {
+    fieldName: 'format',
+    type: 'string',
+  },
+  {
+    fieldName: 'format_id',
+    type: 'string',
+  },
+]
+
 function isValidFormat(format: unknown): format is YtdlFormat {
-  return (
-    isObject(format) &&
-    'format' in format &&
-    typeof format.format === 'string' &&
-    'filesize' in format &&
-    typeof format.filesize === 'number' &&
-    'format_id' in format &&
-    typeof format.format_id === 'string'
+  return formatValidation.every((validation) =>
+    fieldIsValid({
+      fieldName: validation.fieldName,
+      type: validation.type,
+      object: format,
+      isNullable: validation.isNullable,
+    })
   )
 }
 
+interface MetadataValidation {
+  fieldName: keyof YtdlMetadata
+  type: ValidType | ValidType[]
+  isNullable?: boolean
+  validator?: (object: unknown) => void
+}
+const metadataValidation: MetadataValidation[] = [
+  {
+    fieldName: 'title',
+    type: 'string',
+  },
+  {
+    fieldName: 'description',
+    type: 'string',
+  },
+  {
+    fieldName: 'formats',
+    type: 'array',
+    validator: isValidFormat,
+  },
+]
+
 function isValidMetadata(metadata: unknown): metadata is YtdlMetadata {
-  return (
-    isObject(metadata) &&
-    'title' in metadata &&
-    typeof metadata.title === 'string' &&
-    'description' in metadata &&
-    typeof metadata.description === 'string' &&
-    'formats' in metadata &&
-    Array.isArray(metadata.formats) &&
-    metadata.formats.every((format) => isValidFormat(format))
+  return metadataValidation.every((validation) =>
+    fieldIsValid({
+      fieldName: validation.fieldName,
+      type: validation.type,
+      object: metadata,
+      isNullable: validation.isNullable,
+      validator: validation.validator,
+    })
   )
 }
 
@@ -44,16 +176,6 @@ async function getVideoMetadata(url: string) {
     try {
       exec(`youtube-dl --dump-json ${url}`, (error, stdout) => {
         const metadata = JSON.parse(stdout)
-
-        // console.log(Object.keys(metadata))
-        // console.log(metadata.formats, {
-        //   upload_date: metadata.upload_date,
-        //   uploader: metadata.uploader,
-        //   format: metadata.format,
-        //   blah: Object.values(metadata.formats).find(
-        //     (f) => f.format_id === '140'
-        //   ),
-        // })
 
         if (!isValidMetadata(metadata)) {
           throw new Error('Invalid metadata')
