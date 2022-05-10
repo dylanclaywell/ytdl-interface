@@ -14,7 +14,10 @@ interface Props {
   onSelect: (uuid: string) => void
   onDelete: (uuid: string) => void
   onMouseUp: (uuid: string) => void
-  onMouseDown: (uuid: string) => void
+  onMouseDown: (
+    uuid: string,
+    ref: React.MutableRefObject<HTMLButtonElement | null>
+  ) => void
 }
 
 export default function QueuedVideo({
@@ -48,9 +51,9 @@ export default function QueuedVideo({
       ref={ref}
       key={uuid}
       className={classnames(
-        'flex justify-between items-center text-left w-full p-2 hover:bg-gray-100',
+        'flex border border-transparent justify-between items-center text-left w-full p-2 hover:bg-gray-100',
         {
-          'absolute z-10': isDragging,
+          'absolute z-10 shadow-md': isDragging,
           'bg-gray-200 hover:bg-gray-100': isSelected,
         }
       )}
@@ -82,7 +85,7 @@ export default function QueuedVideo({
               }px`
             }
 
-            onMouseDown(uuid)
+            onMouseDown(uuid, ref)
           }}
         >
           drag_indicator

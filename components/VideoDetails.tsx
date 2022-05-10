@@ -29,7 +29,7 @@ export default function VideoDetails({
   const [showDetails, setShowDetails] = useState(false)
 
   return (
-    <>
+    <div className="ml-4">
       <div className="w-full flex justify-center flex-col items-center overflow-y-auto">
         <img
           className="w-full max-w-[30rem]"
@@ -65,6 +65,6 @@ export default function VideoDetails({
         label={showDetails ? 'Hide -' : 'Show +'}
       />
       {showDetails && <p className="whitespace-pre-wrap">{description}</p>}
-    </>
+    </div>
   )
 }
