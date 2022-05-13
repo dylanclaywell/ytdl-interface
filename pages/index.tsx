@@ -5,6 +5,10 @@ import { v4 as generateUuid } from 'uuid'
 import classnames from 'classnames'
 
 import { Format, GetVideoMetadataResponse } from '../types/getVideoMetadata'
+import {
+  QueueVideosArgs,
+  QueuedVideo as QueuedVideoArg,
+} from '../types/queueVideos'
 import QueuedVideo from '../components/QueuedVideo'
 import VideoDetails from '../components/VideoDetails'
 import Header from '../components/Header'
@@ -101,9 +105,7 @@ const Home: NextPage = () => {
     }
 
     fetch(
-      `http://localhost:3000/api/getVideoMetadata?url=${encodeURIComponent(
-        formFields.addUrl
-      )}`,
+      `/api/getVideoMetadata?url=${encodeURIComponent(formFields.addUrl)}`,
       {
         method: 'GET',
       }
@@ -134,6 +136,39 @@ const Home: NextPage = () => {
 
   function deleteVideo(uuid: string) {
     setQueue((q) => q.filter((v) => v.uuid !== uuid))
+  }
+
+  async function submitVideos() {
+    const videos = queue.reduce<QueuedVideoArg[]>((acc, video) => {
+      if (
+        !video.title ||
+        !video.selectedFormat?.name ||
+        !video.selectedFormat?.extension ||
+        !video.id
+      ) {
+        return acc
+      }
+
+      const formattedVideo: QueuedVideoArg = {
+        extension: video.selectedFormat.extension,
+        filename: video.title,
+        format: video.selectedFormat.id,
+        uuid: video.uuid,
+        youtubeId: video.id,
+      }
+
+      acc.push(formattedVideo)
+
+      return acc
+    }, [])
+
+    await fetch('/api/queueVideos', {
+      method: 'POST',
+      body: JSON.stringify({ videos }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
   }
 
   useEffect(() => {
@@ -231,7 +266,7 @@ const Home: NextPage = () => {
         </span>
         <span>{totalDuration}</span>
         <span>{totalFileSize}</span>
-        <Button label="Start" onClick={() => {}} variant="filled" />
+        <Button label="Start" onClick={submitVideos} variant="filled" />
       </div>
     </div>
   )

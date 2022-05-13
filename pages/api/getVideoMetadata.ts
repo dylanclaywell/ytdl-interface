@@ -9,6 +9,7 @@ import {
 import { parseDuration } from '../../utils/parseDuration'
 import { parseFileSize } from '../../utils/parseFileSize'
 import fieldIsValid, { ValidateArgs, ValidType } from '../../utils/fieldIsValid'
+import logger from '../../lib/logger'
 
 const formatValidation: ValidateArgs[] = [
   {
@@ -68,12 +69,17 @@ function isValidMetadata(metadata: unknown): metadata is YtdlMetadata {
 async function getVideoMetadata(url: string) {
   return new Promise<YtdlMetadata>((resolve, reject) => {
     try {
+      logger.log('debug', `youtube-dl --dump-json ${url}`)
+
       exec(`youtube-dl --dump-json ${url}`, (error, stdout) => {
         const metadata = JSON.parse(stdout)
 
         if (!isValidMetadata(metadata)) {
+          logger.log('error', `Invalid metadata for video ${url}`)
           throw new Error('Invalid metadata')
         }
+
+        logger.log('debug', `Successfully retrieved metadata for vide ${url}`)
 
         resolve(metadata)
       })
@@ -84,6 +90,8 @@ async function getVideoMetadata(url: string) {
 }
 
 const handler: NextApiHandler<GetVideoMetadataResponse> = async (req, res) => {
+  logger.log('debug', 'Request: /api/getVideoMetadata')
+
   let url = req.query.url
 
   if (!url || Array.isArray(url)) {
@@ -95,7 +103,7 @@ const handler: NextApiHandler<GetVideoMetadataResponse> = async (req, res) => {
 
     const { title, description, duration, formats } = metadata
 
-    return res.status(200).json({
+    const response: GetVideoMetadataResponse = {
       title,
       description,
       duration: parseDuration(Number(duration)),
@@ -109,10 +117,18 @@ const handler: NextApiHandler<GetVideoMetadataResponse> = async (req, res) => {
           1000
         ).toFixed(2)}MB`,
         id: format.format_id,
+        extension: format.ext,
       })),
-    })
+    }
+
+    logger.log(
+      'debug',
+      `/api/queueVideos response: ${JSON.stringify(response, null, 2)}`
+    )
+
+    return res.status(200).json(response)
   } catch (e) {
-    console.error(e)
+    logger.log('error', e)
     return res.status(500).json({ message: 'Could not get title' })
   }
 }

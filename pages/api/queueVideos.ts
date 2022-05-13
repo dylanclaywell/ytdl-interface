@@ -1,6 +1,7 @@
 import { NextApiHandler } from 'next'
 
 import { getDatabase } from '../../lib/database'
+import logger from '../../lib/logger'
 import { QueuedVideo, QueueVideosArgs } from '../../types/queueVideos'
 import fieldIsValid, { ValidateArgs } from '../../utils/fieldIsValid'
 
@@ -53,13 +54,23 @@ function areValidQueuedVideoArgs(
 }
 
 const handler: NextApiHandler = async (req, res) => {
+  logger.log(
+    'debug',
+    `Request: /api/queueVideos args: ${JSON.stringify(req.body, null, 2)}`
+  )
+
   if (req.method !== 'POST') {
+    logger.log(
+      'error',
+      `/api/queueVideos invalid HTTP method: expected POST; received ${req.method}`
+    )
     return res.status(400).json({ message: 'Invalid request' })
   }
 
   const queuedVideoArgs = req.body
 
   if (!areValidQueuedVideoArgs(queuedVideoArgs)) {
+    logger.log('error', 'Invalid args')
     return res.status(400).json({ message: 'Invalid args' })
   }
 
@@ -99,7 +110,16 @@ const handler: NextApiHandler = async (req, res) => {
         ],
         (error) => {
           if (error) {
-            errors.push(`Could not queue video ${video.uuid}`)
+            const reason = (() => {
+              switch (error.message) {
+                case 'SQLITE_CONSTRAINT: UNIQUE constraint failed: videos.uuid':
+                  return `Video with uuid ${video.uuid} already exists`
+                default:
+                  return 'Database error'
+              }
+            })()
+
+            errors.push(`Could not queue video ${video.uuid}: ${reason}`)
           }
 
           resolve()
@@ -108,7 +128,14 @@ const handler: NextApiHandler = async (req, res) => {
     })
   }
 
-  res.status(200).json({ message: 'OK', errors })
+  const response = { message: 'OK', errors }
+
+  logger.log(
+    'debug',
+    `/api/queueVideos response: ${JSON.stringify(response, null, 2)}`
+  )
+
+  res.status(200).json(response)
 }
 
 export default handler

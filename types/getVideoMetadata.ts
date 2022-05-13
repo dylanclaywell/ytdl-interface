@@ -21,6 +21,7 @@ export interface Format {
   fileSizeInBytes: number
   name: string
   id: string
+  extension: string
 }
 
 export interface Metadata {
