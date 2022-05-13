@@ -63,8 +63,9 @@ const handler: NextApiHandler = async (req, res) => {
     return res.status(400).json({ message: 'Invalid args' })
   }
 
-  const database = getDatabase()
-  const statement = database.prepare(`
+  const database = await getDatabase()
+  const statement = database.prepare(
+    `
     insert into videos (
       uuid,
       youtubeId,
@@ -75,7 +76,13 @@ const handler: NextApiHandler = async (req, res) => {
     ) values (
       ?, ?, ?, ?, ?, ?
     )
-  `)
+  `,
+    (error) => {
+      if (error) {
+        res.status(500).json({ message: 'Could not queue videos' })
+      }
+    }
+  )
 
   const errors: string[] = []
 
@@ -92,7 +99,6 @@ const handler: NextApiHandler = async (req, res) => {
         ],
         (error) => {
           if (error) {
-            console.log('helloooooo')
             errors.push(`Could not queue video ${video.uuid}`)
           }
 
