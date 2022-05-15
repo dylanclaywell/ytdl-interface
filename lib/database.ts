@@ -18,7 +18,7 @@ async function createVideosTable() {
     "format"	TEXT NOT NULL,
     "filename"	TEXT NOT NULL,
     "extension"	TEXT NOT NULL,
-    "status"	TEXT NOT NULL CHECK(status in("Pending", "Cancelled", "Error", "Complete")),
+    "status"	TEXT NOT NULL CHECK(status in("Pending", "In Progress", "Cancelled", "Error", "Complete")),
     PRIMARY KEY("uuid")
   )
   `,

@@ -1,5 +1,8 @@
 import { useState } from 'react'
+import classnames from 'classnames'
+
 import { Format } from '../types/getVideoMetadata'
+import { QueuedVideoStatus } from '../types/queueVideos'
 import { sortFormats } from '../utils/sortFormats'
 import ShowButton from './ShowButton'
 
@@ -11,6 +14,7 @@ interface Props {
   duration: string | undefined
   fileSize: string | undefined
   availableFormats: Format[] | undefined
+  status: QueuedVideoStatus
   onFormatChange: (uuid: string, format: Format) => void
   selectedFormat: Format | undefined
 }
@@ -23,6 +27,7 @@ export default function VideoDetails({
   fileSize,
   duration,
   availableFormats,
+  status,
   onFormatChange,
   selectedFormat,
 }: Props) {
@@ -37,6 +42,16 @@ export default function VideoDetails({
         />
       </div>
       <h2 className="mt-8 mb-4 text-2xl">{title}</h2>
+      <div
+        className={classnames('py-2 px-4 mb-4 rounded-full w-fit', {
+          'bg-cyan-500': status === 'In Progress',
+          'bg-gray-200': status === 'Pending' || status === 'Cancelled',
+          'bg-red-500': status === 'Error',
+          'bg-green-500': status === 'Complete',
+        })}
+      >
+        {status}
+      </div>
       <span>{duration}</span>
       <br />
       <span>{fileSize}</span>

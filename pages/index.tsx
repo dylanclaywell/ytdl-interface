@@ -3,11 +3,13 @@ import type { NextPage } from 'next'
 import Head from 'next/head'
 import { v4 as generateUuid } from 'uuid'
 import classnames from 'classnames'
+import io from 'socket.io-client'
 
 import { Format, GetVideoMetadataResponse } from '../types/getVideoMetadata'
 import {
   QueueVideosArgs,
   QueuedVideo as QueuedVideoArg,
+  QueuedVideoStatus,
 } from '../types/queueVideos'
 import QueuedVideo from '../components/QueuedVideo'
 import VideoDetails from '../components/VideoDetails'
@@ -17,6 +19,7 @@ import AppSection from '../components/AppSection'
 import { parseDuration } from '../utils/parseDuration'
 import { parseFileSize } from '../utils/parseFileSize'
 import { sortFormats } from '../utils/sortFormats'
+import { GetQueueStatusResponse } from '../types/getQueueStatus'
 
 interface FormFields {
   addUrl: string | undefined
@@ -28,16 +31,19 @@ const blankFormFields: FormFields = {
 
 interface Video {
   uuid: string
-  id?: string
-  description?: string
-  title?: string
-  url: string
-  fileSize?: string
-  duration?: string
-  durationInMilliseconds?: number
-  availableFormats?: Format[]
-  selectedFormat?: Format
   sortOrder: number
+  url: string
+  id: string
+  selectedFormat: Format | undefined
+  status: QueuedVideoStatus
+
+  metadata?: {
+    description: string
+    title: string
+    duration: string
+    durationInMilliseconds: number
+    availableFormats: Format[]
+  }
 }
 
 interface DraggingVideo {
@@ -59,7 +65,7 @@ const Home: NextPage = () => {
 
   const totalDuration = parseDuration(
     queue.reduce((acc, val) => {
-      acc += val.durationInMilliseconds ?? 0
+      acc += val.metadata?.durationInMilliseconds ?? 0
       return acc
     }, 0)
   )
@@ -99,9 +105,11 @@ const Home: NextPage = () => {
 
     const video: Video = {
       uuid,
+      sortOrder: queue.length + 1,
       id,
       url: formFields.addUrl,
-      sortOrder: queue.length + 1,
+      selectedFormat: undefined,
+      status: 'Pending',
     }
 
     fetch(
@@ -121,11 +129,18 @@ const Home: NextPage = () => {
       setQueue((q) => {
         return q.map((v) => ({
           ...v,
-          ...(v.uuid === uuid && {
-            ...videoMetadataResponse,
-            selectedFormat:
-              videoMetadataResponse.availableFormats?.sort(sortFormats)[0],
-          }),
+          ...(v.uuid === uuid
+            ? {
+                selectedFormat:
+                  videoMetadataResponse.availableFormats?.sort(sortFormats)[0],
+              }
+            : v.selectedFormat),
+          metadata:
+            v.uuid === uuid
+              ? {
+                  ...videoMetadataResponse,
+                }
+              : v.metadata,
         }))
       })
     })
@@ -140,18 +155,13 @@ const Home: NextPage = () => {
 
   async function submitVideos() {
     const videos = queue.reduce<QueuedVideoArg[]>((acc, video) => {
-      if (
-        !video.title ||
-        !video.selectedFormat?.name ||
-        !video.selectedFormat?.extension ||
-        !video.id
-      ) {
+      if (!video.metadata || !video.selectedFormat) {
         return acc
       }
 
       const formattedVideo: QueuedVideoArg = {
         extension: video.selectedFormat.extension,
-        filename: video.title,
+        filename: video.metadata.title,
         format: video.selectedFormat.id,
         uuid: video.uuid,
         youtubeId: video.id,
@@ -171,6 +181,22 @@ const Home: NextPage = () => {
     })
   }
 
+  async function getQueueStatus() {
+    const queueVideos = (
+      (await (
+        await fetch('/api/getQueueStatus')
+      ).json()) as GetQueueStatusResponse
+    ).videos
+
+    setQueue((q) =>
+      q.map((v) => {
+        const queuedVideo = queueVideos.find((video) => video.uuid === v.uuid)
+
+        return { ...v, status: queuedVideo ? queuedVideo.status : v.status }
+      })
+    )
+  }
+
   useEffect(() => {
     if (queue.length) {
       localStorage.setItem('ytdlQueue', JSON.stringify(queue))
@@ -180,6 +206,10 @@ const Home: NextPage = () => {
   useEffect(() => {
     const newQueue = JSON.parse(localStorage.getItem('ytdlQueue') ?? '[]')
     setQueue(newQueue)
+
+    setInterval(async () => {
+      await getQueueStatus()
+    }, 1000)
   }, [])
 
   return (
@@ -216,7 +246,8 @@ const Home: NextPage = () => {
                       setDraggingVideoElement({ uuid, ref })
                     }
                     onMouseUp={(uuid) => setDraggingVideoElement(null)}
-                    title={video.title}
+                    status={video.status}
+                    title={video.metadata?.title}
                     url={video.url}
                     uuid={video.uuid}
                   />
@@ -243,11 +274,12 @@ const Home: NextPage = () => {
                 id={selectedVideo.id}
                 uuid={selectedVideo.uuid}
                 selectedFormat={selectedVideo.selectedFormat}
-                title={selectedVideo.title ?? selectedVideo.url}
-                description={selectedVideo.description}
-                fileSize={selectedVideo.fileSize}
-                duration={selectedVideo.duration}
-                availableFormats={selectedVideo.availableFormats}
+                title={selectedVideo.metadata?.title ?? selectedVideo.url}
+                description={selectedVideo.metadata?.description}
+                fileSize={selectedVideo.selectedFormat?.fileSize}
+                duration={selectedVideo.metadata?.duration}
+                availableFormats={selectedVideo.metadata?.availableFormats}
+                status={selectedVideo.status}
                 onFormatChange={onVideoFormatChange}
               />
             )}

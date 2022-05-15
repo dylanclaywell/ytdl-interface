@@ -9,3 +9,10 @@ export interface QueuedVideo {
 export interface QueueVideosArgs {
   videos: QueuedVideo[]
 }
+
+export type QueuedVideoStatus =
+  | 'Pending'
+  | 'In Progress'
+  | 'Cancelled'
+  | 'Error'
+  | 'Complete'

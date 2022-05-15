@@ -2,7 +2,7 @@ import { NextApiHandler } from 'next'
 
 import { getDatabase } from '../../lib/database'
 import logger from '../../lib/logger'
-import startQueue from '../../queue'
+import { startQueue } from '../../queue'
 import { QueuedVideo, QueueVideosArgs } from '../../types/queueVideos'
 import fieldIsValid, { ValidateArgs } from '../../utils/fieldIsValid'
 

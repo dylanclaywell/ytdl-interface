@@ -3,10 +3,53 @@ import path from 'path'
 
 import { getDatabase } from '../lib/database'
 import logger from '../lib/logger'
-import { QueuedVideo } from '../types/queueVideos'
+import { QueuedVideo, QueuedVideoStatus } from '../types/queueVideos'
 
 export default class QueueProcessor {
   downloadInProgress = false
+
+  async updateQueuedVideoStatus(uuid: string, status: QueuedVideoStatus) {
+    const database = await getDatabase()
+
+    await new Promise<void>((resolve) => {
+      database.run(
+        `update videos set status = ? where uuid = ?`,
+        [status, uuid],
+        (result: any, error: any) => {
+          if (error) {
+            logger.log('error', `Could not update the status for video ${uuid}`)
+            resolve()
+          }
+
+          logger.log('debug', `Updated the status for video ${uuid}`)
+
+          resolve()
+        }
+      )
+    })
+  }
+
+  async downloadVideo(video: QueuedVideo) {
+    await new Promise<void>((resolve) => {
+      exec(
+        `youtube-dl ${video.youtubeId} -f ${video.format} -o "${path.resolve(
+          __dirname,
+          `../../../../output/${video.filename}.${video.extension}`
+        )}"`,
+        (error) => {
+          if (error) {
+            logger.log(
+              'error',
+              `Error downloading video ${video.uuid}: ${error.message}`
+            )
+            resolve()
+          }
+
+          resolve()
+        }
+      )
+    })
+  }
 
   async start() {
     logger.log('debug', 'Starting video queue')
@@ -44,28 +87,16 @@ export default class QueueProcessor {
         )}`
       )
 
-      await new Promise<void>((resolve, reject) => {
-        exec(
-          `youtube-dl ${video.youtubeId} -f ${video.format} -o "${path.resolve(
-            __dirname,
-            `../../../../output/${video.filename}.${video.extension}`
-          )}"`,
-          (error) => {
-            if (error) {
-              logger.log(
-                'error',
-                `Error downloading video ${video.uuid}: ${error.message}`
-              )
-              resolve()
-            }
+      await this.updateQueuedVideoStatus(video.uuid, 'In Progress')
 
-            resolve()
-          }
-        )
-      })
+      await this.downloadVideo(video)
+
+      await this.updateQueuedVideoStatus(video.uuid, 'Complete')
 
       logger.log('debug', `Downloading video ${video.uuid} completed`)
     }
+
+    this.downloadInProgress = false
 
     logger.log('debug', `Downloading complete - processed  videos`)
   }

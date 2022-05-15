@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import classnames from 'classnames'
 import { useMouse } from '../contexts/Mouse'
+import { QueuedVideoStatus } from '../types/queueVideos'
 
 interface Props {
   uuid: string
   title: string | undefined
   url: string | undefined
+  status: QueuedVideoStatus
   isHovered: boolean
   isSelected: boolean
   isDragging: boolean
@@ -24,6 +26,7 @@ export default function QueuedVideo({
   uuid,
   title,
   url,
+  status,
   isHovered,
   isSelected,
   isDragging,
