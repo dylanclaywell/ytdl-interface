@@ -2,6 +2,7 @@ import { NextApiHandler } from 'next'
 
 import { getDatabase } from '../../lib/database'
 import logger from '../../lib/logger'
+import startQueue from '../../queue'
 import { QueuedVideo, QueueVideosArgs } from '../../types/queueVideos'
 import fieldIsValid, { ValidateArgs } from '../../utils/fieldIsValid'
 
@@ -134,6 +135,8 @@ const handler: NextApiHandler = async (req, res) => {
     'debug',
     `/api/queueVideos response: ${JSON.stringify(response, null, 2)}`
   )
+
+  void startQueue()
 
   res.status(200).json(response)
 }
