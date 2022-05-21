@@ -325,6 +325,22 @@ const Home: NextPage = () => {
                 availableFormats={selectedVideo.metadata?.availableFormats}
                 status={selectedVideo.status}
                 onFormatChange={onVideoFormatChange}
+                onTitleChange={(uuid: string, title: string) => {
+                  setQueue((q) => {
+                    const newQueue = q.map((v) => ({
+                      ...v,
+                      ...(v.uuid === uuid && v.metadata
+                        ? {
+                            metadata: { ...v.metadata, title },
+                          }
+                        : {}),
+                    }))
+
+                    localStorage.setItem('ytdlQueue', JSON.stringify(newQueue))
+
+                    return newQueue
+                  })
+                }}
               />
             )}
           </AppSection>

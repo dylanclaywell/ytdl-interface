@@ -5,13 +5,19 @@ interface Props {
   value: string
   onChange: React.ChangeEventHandler<HTMLInputElement>
   label: string
+  fullWidth?: boolean
 }
 
-export default function TextField({ value, onChange, label }: Props) {
+export default function TextField({
+  value,
+  onChange,
+  label,
+  fullWidth,
+}: Props) {
   const id = useId()
 
   return (
-    <div className="relative">
+    <div className={classnames('relative', { 'w-full': fullWidth })}>
       <input
         id={id}
         className="border w-full border-gray-400 rounded-md p-2 h-11"

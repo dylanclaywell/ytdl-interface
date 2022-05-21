@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { ChangeEvent, useState } from 'react'
 import classnames from 'classnames'
 
 import { Format } from '../types/getVideoMetadata'
 import { QueuedVideoStatus } from '../types/downloadVideo'
 import { sortFormats } from '../utils/sortFormats'
 import ShowButton from './ShowButton'
+import TextField from './TextField'
 
 interface Props {
   id: string | undefined
@@ -17,6 +18,7 @@ interface Props {
   status: QueuedVideoStatus
   onFormatChange: (uuid: string, format: Format) => void
   selectedFormat: Format | undefined
+  onTitleChange: (uuid: string, title: string) => void
 }
 
 export default function VideoDetails({
@@ -30,8 +32,11 @@ export default function VideoDetails({
   status,
   onFormatChange,
   selectedFormat,
+  onTitleChange,
 }: Props) {
   const [showDetails, setShowDetails] = useState(false)
+  const [previousTitle, setPreviousTitle] = useState<string>(title)
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
 
   return (
     <div className="ml-4">
@@ -41,7 +46,51 @@ export default function VideoDetails({
           src={`http://img.youtube.com/vi/${id}/0.jpg`}
         />
       </div>
-      <h2 className="mt-8 mb-4 text-2xl">{title}</h2>
+      <h2 className="mt-8 mb-4 text-2xl flex">
+        {isEditingTitle ? (
+          <div className="w-full mr-4">
+            <TextField
+              fullWidth
+              value={title}
+              label="Title"
+              onChange={(e) => {
+                onTitleChange(uuid, e.target.value)
+              }}
+            />
+          </div>
+        ) : (
+          title
+        )}
+        {isEditingTitle && (
+          <button
+            onClick={() => {
+              setIsEditingTitle(false)
+            }}
+            className="text-gray-500 flex flex-shrink-0 items-center justify-center rounded-full w-10 h-10 hover:text-green-700"
+          >
+            <span className="material-icons">check</span>
+          </button>
+        )}
+        <button
+          onClick={() => {
+            if (isEditingTitle) {
+              setIsEditingTitle(false)
+              onTitleChange(uuid, previousTitle)
+            } else {
+              setPreviousTitle(title)
+              setIsEditingTitle(true)
+            }
+          }}
+          className={classnames(
+            'text-gray-500 flex flex-shrink-0 items-center justify-center rounded-full w-10 h-10',
+            { 'hover:text-red-700': isEditingTitle }
+          )}
+        >
+          <span className="material-icons">
+            {isEditingTitle ? 'close' : 'edit'}
+          </span>
+        </button>
+      </h2>
       <div
         className={classnames('py-2 px-4 mb-4 rounded-full w-fit', {
           'bg-cyan-500': status === 'In Progress',
