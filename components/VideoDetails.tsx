@@ -2,7 +2,7 @@ import { useState } from 'react'
 import classnames from 'classnames'
 
 import { Format } from '../types/getVideoMetadata'
-import { QueuedVideoStatus } from '../types/queueVideos'
+import { QueuedVideoStatus } from '../types/downloadVideo'
 import { sortFormats } from '../utils/sortFormats'
 import ShowButton from './ShowButton'
 

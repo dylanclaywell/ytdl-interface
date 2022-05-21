@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import classnames from 'classnames'
 import { useMouse } from '../contexts/Mouse'
-import { QueuedVideoStatus } from '../types/queueVideos'
+import { QueuedVideoStatus } from '../types/downloadVideo'
+
+import styles from './QueuedVideo.module.css'
 
 interface Props {
   uuid: string
   title: string | undefined
   url: string | undefined
+  downloadedFilesize: number | undefined
+  totalFilesize: number | undefined
   status: QueuedVideoStatus
   isHovered: boolean
   isSelected: boolean
   isDragging: boolean
+  isDownloading: boolean
   onMouseEnter: (uuid: string) => void
   onMouseLeave: (uuid: string) => void
   onSelect: (uuid: string) => void
@@ -26,10 +31,13 @@ export default function QueuedVideo({
   uuid,
   title,
   url,
+  downloadedFilesize,
+  totalFilesize,
   status,
   isHovered,
   isSelected,
   isDragging,
+  isDownloading,
   onSelect,
   onMouseEnter,
   onMouseLeave,
@@ -39,6 +47,14 @@ export default function QueuedVideo({
 }: Props) {
   const mouse = useMouse()
   const ref = useRef<HTMLButtonElement | null>(null)
+
+  const percentComplete = `${
+    (isDownloading && downloadedFilesize && totalFilesize
+      ? downloadedFilesize / totalFilesize
+      : status === 'Complete'
+      ? 1
+      : 0) * 100
+  }%`
 
   useEffect(() => {
     if (ref.current && isDragging) {
@@ -54,12 +70,18 @@ export default function QueuedVideo({
       ref={ref}
       key={uuid}
       className={classnames(
-        'flex border border-transparent justify-between items-center text-left w-full p-2 hover:bg-gray-100',
+        'relative flex border border-transparent justify-between items-center text-left w-full p-2 hover:bg-gray-100 after:absolute after:top-0 after:left-0 after:bg-[#1bb50066] after:w-full after:h-full after:pointer-events-none',
         {
           'absolute z-10 shadow-md': isDragging,
           'bg-gray-200 hover:bg-gray-100': isSelected,
-        }
+        },
+        styles['queued-video']
       )}
+      style={
+        {
+          '--width': percentComplete,
+        } as React.CSSProperties
+      }
       onClick={() => onSelect(uuid)}
       onMouseEnter={() => onMouseEnter(uuid)}
       onMouseLeave={() => onMouseLeave(uuid)}
@@ -95,7 +117,6 @@ export default function QueuedVideo({
         </span>
         <span className="flex items-center justify-center">{title ?? url}</span>
       </span>
-
       <span
         className={classnames(
           'text-base text-gray-500 material-icons hover:bg-gray-200 w-6 h-6 flex justify-center items-center rounded-full',

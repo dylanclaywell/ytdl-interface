@@ -3,14 +3,9 @@ import type { NextPage } from 'next'
 import Head from 'next/head'
 import { v4 as generateUuid } from 'uuid'
 import classnames from 'classnames'
-import io from 'socket.io-client'
 
 import { Format, GetVideoMetadataResponse } from '../types/getVideoMetadata'
-import {
-  QueueVideosArgs,
-  QueuedVideo as QueuedVideoArg,
-  QueuedVideoStatus,
-} from '../types/queueVideos'
+import { DownloadVideoArgs, QueuedVideoStatus } from '../types/downloadVideo'
 import QueuedVideo from '../components/QueuedVideo'
 import VideoDetails from '../components/VideoDetails'
 import Header from '../components/Header'
@@ -19,7 +14,7 @@ import AppSection from '../components/AppSection'
 import { parseDuration } from '../utils/parseDuration'
 import { parseFileSize } from '../utils/parseFileSize'
 import { sortFormats } from '../utils/sortFormats'
-import { GetQueueStatusResponse } from '../types/getQueueStatus'
+import { GetVideoDownloadProgress } from '../types/getVideoDownloadProgress'
 
 interface FormFields {
   addUrl: string | undefined
@@ -36,6 +31,7 @@ interface Video {
   id: string
   selectedFormat: Format | undefined
   status: QueuedVideoStatus
+  downloadedFilesize?: number
 
   metadata?: {
     description: string
@@ -56,12 +52,18 @@ const Home: NextPage = () => {
   const [formFields, setFormFields] = useState<FormFields>(blankFormFields)
   const [queue, setQueue] = useState<Video[]>([])
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null)
+  const [downloadingVideoId, setDownloadVideoId] = useState<string | null>(null)
   const [draggingVideoElement, setDraggingVideoElement] =
     useState<DraggingVideo | null>(null)
   const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null)
+  const [isDownloading, setIsDownloading] = useState(false)
+  const downloadingVideoRef = useRef<Video | null>(null)
+  const [downloadingQueue, setDownloadingQueue] = useState<Video[] | null>(null)
+  const [downloadingQueueIndex, setDownloadingQueueIndex] = useState<number>(0)
 
   const selectedVideo = queue.find((v) => v.uuid === selectedVideoId)
   const draggingVideo = queue.find((v) => v.uuid === draggingVideoElement?.uuid)
+  const downloadingVideo = queue.find((v) => v.uuid === downloadingVideoId)
 
   const totalDuration = parseDuration(
     queue.reduce((acc, val) => {
@@ -127,14 +129,14 @@ const Home: NextPage = () => {
       }
 
       setQueue((q) => {
-        return q.map((v) => ({
+        const newQueue = q.map((v) => ({
           ...v,
           ...(v.uuid === uuid
             ? {
                 selectedFormat:
                   videoMetadataResponse.availableFormats?.sort(sortFormats)[0],
               }
-            : v.selectedFormat),
+            : { selectedFormat: v.selectedFormat }),
           metadata:
             v.uuid === uuid
               ? {
@@ -142,6 +144,10 @@ const Home: NextPage = () => {
                 }
               : v.metadata,
         }))
+
+        localStorage.setItem('ytdlQueue', JSON.stringify(newQueue))
+
+        return newQueue
       })
     })
 
@@ -150,66 +156,101 @@ const Home: NextPage = () => {
   }
 
   function deleteVideo(uuid: string) {
-    setQueue((q) => q.filter((v) => v.uuid !== uuid))
+    setQueue((q) => {
+      const newQueue = q.filter((v) => v.uuid !== uuid)
+      localStorage.setItem('ytdlQueue', JSON.stringify(newQueue))
+      return newQueue
+    })
   }
 
-  async function submitVideos() {
-    const videos = queue.reduce<QueuedVideoArg[]>((acc, video) => {
-      if (!video.metadata || !video.selectedFormat) {
-        return acc
-      }
+  async function downloadVideo(video: Video) {
+    if (!video.metadata || !video.selectedFormat) {
+      return
+    }
 
-      const formattedVideo: QueuedVideoArg = {
-        extension: video.selectedFormat.extension,
-        filename: video.metadata.title,
-        format: video.selectedFormat.id,
-        uuid: video.uuid,
-        youtubeId: video.id,
-      }
+    const formattedVideo: DownloadVideoArgs = {
+      extension: video.selectedFormat.extension,
+      filename: video.metadata.title,
+      format: video.selectedFormat.id,
+      uuid: video.uuid,
+      youtubeId: video.id,
+    }
 
-      acc.push(formattedVideo)
-
-      return acc
-    }, [])
-
-    await fetch('/api/queueVideos', {
+    await fetch('/api/downloadVideo', {
       method: 'POST',
-      body: JSON.stringify({ videos }),
+      body: JSON.stringify(formattedVideo),
       headers: {
         'Content-Type': 'application/json',
       },
     })
   }
 
-  async function getQueueStatus() {
-    const queueVideos = (
-      (await (
-        await fetch('/api/getQueueStatus')
-      ).json()) as GetQueueStatusResponse
-    ).videos
+  async function getDownloadVideoProgress(video: Video | null) {
+    if (!video) {
+      return
+    }
 
-    setQueue((q) =>
-      q.map((v) => {
-        const queuedVideo = queueVideos.find((video) => video.uuid === v.uuid)
+    const videoProgress = (await (
+      await fetch(
+        `/api/getVideoDownloadProgress?uuid=${video.uuid}&extension=${video.selectedFormat?.extension}&filename=${video.metadata?.title}`,
+        {
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        }
+      )
+    ).json()) as GetVideoDownloadProgress
 
-        return { ...v, status: queuedVideo ? queuedVideo.status : v.status }
-      })
-    )
+    if (downloadingVideoRef.current && 'uuid' in videoProgress) {
+      setQueue((q) =>
+        q.map((v) => ({
+          ...v,
+          downloadedFilesize: Number(videoProgress.filesize),
+        }))
+      )
+    }
   }
 
   useEffect(() => {
-    if (queue.length) {
-      localStorage.setItem('ytdlQueue', JSON.stringify(queue))
+    if (downloadingQueue?.length) {
+      const video = downloadingQueue[downloadingQueueIndex]
+      downloadingVideoRef.current = video
+      setDownloadVideoId(video.uuid)
+      downloadVideo(video).then(() => {
+        if (downloadingQueueIndex + 1 < downloadingQueue.length) {
+          setDownloadingQueueIndex((i) => i + 1)
+          setQueue((q) =>
+            q.map((v) => ({
+              ...v,
+              ...(v.uuid === video.uuid ? { status: 'Complete' as const } : {}),
+            }))
+          )
+        } else {
+          setIsDownloading(false)
+          setDownloadingQueueIndex(0)
+          setDownloadingQueue(null)
+          setDownloadVideoId(null)
+          setQueue((q) =>
+            q.map((v) => ({
+              ...v,
+              ...(v.uuid === video.uuid ? { status: 'Complete' as const } : {}),
+            }))
+          )
+          downloadingVideoRef.current = null
+        }
+      })
     }
-  }, [queue])
+  }, [downloadingQueue, downloadingQueueIndex])
 
   useEffect(() => {
     const newQueue = JSON.parse(localStorage.getItem('ytdlQueue') ?? '[]')
     setQueue(newQueue)
 
-    setInterval(async () => {
-      await getQueueStatus()
+    const interval = setInterval(async () => {
+      await getDownloadVideoProgress(downloadingVideoRef.current)
     }, 1000)
+
+    return () => clearInterval(interval)
   }, [])
 
   return (
@@ -240,6 +281,7 @@ const Home: NextPage = () => {
                     onDelete={() => deleteVideo(video.uuid)}
                     isSelected={selectedVideoId === video.uuid}
                     isDragging={draggingVideo?.uuid === video.uuid}
+                    isDownloading={downloadingVideoId === video.uuid}
                     onMouseEnter={() => setHoveredVideoId(video.uuid)}
                     onMouseLeave={() => setHoveredVideoId(null)}
                     onMouseDown={(uuid, ref) =>
@@ -250,6 +292,8 @@ const Home: NextPage = () => {
                     title={video.metadata?.title}
                     url={video.url}
                     uuid={video.uuid}
+                    totalFilesize={video.selectedFormat?.fileSizeInBytes}
+                    downloadedFilesize={video.downloadedFilesize}
                   />
                   <div
                     className={classnames(
@@ -298,7 +342,19 @@ const Home: NextPage = () => {
         </span>
         <span>{totalDuration}</span>
         <span>{totalFileSize}</span>
-        <Button label="Start" onClick={submitVideos} variant="filled" />
+        <Button
+          label={isDownloading ? 'Downloading' : 'Start'}
+          onClick={() => {
+            const queuedVideos = queue.filter((v) => v.status === 'Pending')
+
+            if (queuedVideos.length) {
+              setIsDownloading(true)
+              setDownloadingQueue(queuedVideos)
+            }
+          }}
+          variant="filled"
+          isDisabled={isDownloading}
+        />
       </div>
     </div>
   )

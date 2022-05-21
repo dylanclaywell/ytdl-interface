@@ -1,13 +1,9 @@
-export interface QueuedVideo {
+export interface DownloadVideoArgs {
   uuid: string
   youtubeId: string
   filename: string
   format: string
   extension: string
-}
-
-export interface QueueVideosArgs {
-  videos: QueuedVideo[]
 }
 
 export type QueuedVideoStatus =
